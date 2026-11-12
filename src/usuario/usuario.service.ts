@@ -1,21 +1,20 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
-import { usuarios, Temporal } from './bdtemporal';
+import { Temporal, usuarios } from './bdtemporal';
 
 @Injectable()
 export class UsuarioService {
+  // El id nunca se reutiliza, aunque se eliminen usuarios.
+  private siguienteId = Math.max(0, ...usuarios.map((u) => u.id)) + 1;
 
   create(createUsuarioDto: CreateUsuarioDto) {
-
     const nuevoUsuario = new Temporal(
-      usuarios.length + 1,
+      this.siguienteId++,
       createUsuarioDto.nombre,
       createUsuarioDto.edad,
     );
-
     usuarios.push(nuevoUsuario);
-
     return nuevoUsuario;
   }
 
@@ -24,38 +23,40 @@ export class UsuarioService {
   }
 
   findOne(id: number) {
-    return usuarios.find(usuario => usuario.id === id);
+    return this.buscar(id);
   }
 
+  // PUT: reemplaza el usuario completo (nombre y edad obligatorios).
+  replace(id: number, createUsuarioDto: CreateUsuarioDto) {
+    const usuario = this.buscar(id);
+    usuario.nombre = createUsuarioDto.nombre;
+    usuario.edad = createUsuarioDto.edad;
+    return usuario;
+  }
+
+  // PATCH: actualiza solo los campos enviados.
   update(id: number, updateUsuarioDto: UpdateUsuarioDto) {
-
-    const usuario = usuarios.find(usuario => usuario.id === id);
-
-    if (!usuario) {
-      return `Usuario con ID ${id} no encontrado`;
-    }
-
+    const usuario = this.buscar(id);
     if (updateUsuarioDto.nombre !== undefined) {
       usuario.nombre = updateUsuarioDto.nombre;
     }
-
     if (updateUsuarioDto.edad !== undefined) {
       usuario.edad = updateUsuarioDto.edad;
     }
-
     return usuario;
   }
 
   remove(id: number) {
+    const usuario = this.buscar(id);
+    usuarios.splice(usuarios.indexOf(usuario), 1);
+    return usuario;
+  }
 
-    const indice = usuarios.findIndex(usuario => usuario.id === id);
-
-    if (indice === -1) {
-      return `Usuario con ID ${id} no encontrado`;
+  private buscar(id: number): Temporal {
+    const usuario = usuarios.find((u) => u.id === id);
+    if (!usuario) {
+      throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
     }
-
-    const usuarioEliminado = usuarios.splice(indice, 1);
-
-    return usuarioEliminado[0];
+    return usuario;
   }
 }
